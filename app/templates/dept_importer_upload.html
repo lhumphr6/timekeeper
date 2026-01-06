@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Import Another Department</title>
+  </head>
+  <body class="tk">
+    <div class="page-wide">
+      <div class="panel">
+        <div class="panel-title">Import Another Department</div>
+        <form method="post" action="/import/department/upload" enctype="multipart/form-data" class="panel toolbar" style="gap:12px; flex-wrap:wrap; align-items:center;">
+          <label class="label">Time Period</label>
+          <select class="select" name="timesheet_id" required>
+            {% for p in period_options %}
+              <option value="{{ p.timesheet_id }}" {% if active_ts == p.timesheet_id %}selected{% endif %}>{{ p.display }}</option>
+            {% endfor %}
+          </select>
+          <label class="label">File</label>
+          <input class="input" type="file" name="file" accept=".csv,.xlsx,.xlsm,.txt" required>
+          <label class="checkbox" style="display:flex; gap:6px; align-items:center;">
+            <input type="checkbox" name="restrict_to_period" value="1" checked> Only import rows within this time period's date range
+          </label>
+          <button class="btn primary" type="submit">Upload</button>
+        </form>
+        <div class="muted" style="margin-top:8px;">Supported files: CSV, XLSX. Expected columns include Employee Name, Date, Clock In, Clock Out, Break Hours, PTO Hours, PTO Type. We'll normalize whatever headers you have.</div>
+      </div>
+    </div>
+  </body>
+</html>
