@@ -276,7 +276,15 @@ async def importer_execute(
     selected_set = {s.strip() for s in (selected_names or "").split(",") if s.strip()}
     rows = [r for r in rows if r["employee_name"] in selected_set]
     week_rows = db.execute(text("SELECT day_date, week_number FROM week_assignments WHERE timesheet_id = :tid"), {"tid": timesheet_id}).fetchall()
-    week_map = {row[0]: int(row[1]) for row in week_rows}
+    # Convert string dates to date objects for proper comparison
+    week_map = {}
+    for row in week_rows:
+        day_date_value = row[0]
+        if isinstance(day_date_value, str):
+            day_date_value = date.fromisoformat(day_date_value)
+        elif isinstance(day_date_value, datetime):
+            day_date_value = day_date_value.date()
+        week_map[day_date_value] = int(row[1])
     batch = ImportBatch(timesheet_id=timesheet_id, source_name=f"Department import {slug}", created_at=datetime.utcnow())
     db.add(batch)
     db.flush()
