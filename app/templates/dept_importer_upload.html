@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Import Another Department - Timekeeper</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { color: #333; border-bottom: 2px solid #4CAF50; padding-bottom: 10px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+        select, input[type="file"] { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+        .checkbox-group { display: flex; align-items: center; }
+        .checkbox-group input[type="checkbox"] { width: auto; margin-right: 10px; }
+        .checkbox-group label { margin-bottom: 0; font-weight: normal; }
+        button { background: #4CAF50; color: white; padding: 12px 30px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #45a049; }
+        .error { background: #f44336; color: white; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
+        .info { background: #2196F3; color: white; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
+        .back-link { display: inline-block; margin-top: 20px; color: #2196F3; text-decoration: none; }
+        .back-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Import Another Department</h1>
+        
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+        
+        <form method="post" action="/import/department/upload" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="timesheet_id">Time Period:</label>
+                <select name="timesheet_id" id="timesheet_id" required>
+                    {% for period in period_options %}
+                    <option value="{{ period.timesheet_id }}" {% if period.timesheet_id == selected_timesheet_id %}selected{% endif %}>
+                        {{ period.display }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="file">Upload File (CSV, XLSX):</label>
+                <input type="file" name="file" id="file" accept=".csv,.xlsx,.xlsm,.xls" required>
+            </div>
+            
+            <div class="form-group checkbox-group">
+                <input type="checkbox" name="restrict_to_period" id="restrict_to_period" value="true">
+                <label for="restrict_to_period">Restrict to selected time period dates only</label>
+            </div>
+            
+            <button type="submit">Upload and Preview</button>
+        </form>
+        
+        <a href="/viewer{% if selected_timesheet_id %}?timesheet_id={{ selected_timesheet_id }}{% endif %}" class="back-link">← Back to Timesheet Editor</a>
+    </div>
+</body>
+</html>

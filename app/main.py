@@ -38,6 +38,9 @@ from .utils import (
 # Attendance router (keeps this file small)
 from .attendance import router as attendance_router
 
+# Department importer router
+from .dept_importer import router as dept_importer_router
+
 SECRET_KEY = os.getenv("SECRET_KEY", "please-change-me")
 DEFAULT_ADMIN_USER = os.getenv("DEFAULT_ADMIN_USER", "Admin")
 DEFAULT_ADMIN_PASSWORD = os.getenv("DEFAULT_ADMIN_PASSWORD", "1Senior!")
@@ -2226,6 +2229,9 @@ def pto_tracker_print_all(
 
 # Mount the Attendance router
 app.include_router(attendance_router)
+
+# Mount the Department Importer router
+app.include_router(dept_importer_router)
 
 if __name__ == "__main__":
     import uvicorn

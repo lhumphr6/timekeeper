@@ -1,5 +1,5 @@
 """Database connection and session management."""
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, declarative_base
 import os
 
@@ -20,4 +20,4 @@ def get_session():
 def ping_db():
     """Test database connectivity."""
     with engine.connect() as conn:
-        conn.execute("SELECT 1")
+        conn.execute(text("SELECT 1"))

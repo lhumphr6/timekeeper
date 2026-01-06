@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timesheet Editor - Timekeeper</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { color: #333; border-bottom: 2px solid #4CAF50; padding-bottom: 10px; margin-bottom: 20px; }
+        .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px; background: #f9f9f9; border-radius: 4px; }
+        .period-selector { flex: 1; max-width: 300px; }
+        .import-btn { background: #2196F3; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; }
+        .import-btn:hover { background: #1976D2; }
+        .flash-message { background: #4CAF50; color: white; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
+        .employee-list { margin-bottom: 30px; }
+        .employee-list select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+        .timesheet-data { margin-top: 30px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #f5f5f5; font-weight: bold; color: #555; }
+        tr:hover { background: #f9f9f9; }
+        .no-data { text-align: center; padding: 40px; color: #999; }
+        .warning-box { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin-bottom: 20px; }
+        .action-buttons { margin-top: 20px; display: flex; gap: 10px; }
+        .btn { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        .btn-primary { background: #4CAF50; color: white; }
+        .btn-primary:hover { background: #45a049; }
+        .btn-warning { background: #ff9800; color: white; }
+        .btn-warning:hover { background: #f57c00; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Timesheet Editor</h1>
+        
+        {% if flash %}
+        <div class="flash-message">{{ flash }}</div>
+        {% endif %}
+        
+        {% if all_done %}
+        <div class="flash-message">{{ flash }}</div>
+        <p class="no-data">All timesheets for this period have been submitted!</p>
+        {% else %}
+        
+        <div class="toolbar">
+            <div class="period-selector">
+                <label for="period_select"><strong>Time Period:</strong></label>
+                <select id="period_select" onchange="window.location.href='/viewer?timesheet_id=' + this.value">
+                    {% for period in period_options %}
+                    <option value="{{ period.timesheet_id }}" {% if period.timesheet_id == active_ts %}selected{% endif %}>
+                        {{ period.display }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            {% if can_edit and active_ts %}
+            <a href="/import/department?timesheet_id={{ active_ts }}" class="import-btn">
+                📥 Import Another Department
+            </a>
+            {% endif %}
+        </div>
+        
+        {% if employees %}
+        <div class="employee-list">
+            <label for="employee_select"><strong>Select Employee:</strong></label>
+            <select id="employee_select" onchange="window.location.href='/viewer?timesheet_id={{ active_ts }}&employee_id=' + this.value">
+                {% for emp in employees %}
+                <option value="{{ emp.id }}" {% if selected_employee and emp.id == selected_employee.id %}selected{% endif %}>
+                    {{ emp.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        
+        {% if selected_employee and grouped %}
+        <h2>{{ selected_employee.name }}</h2>
+        
+        {% if duplicates %}
+        <div class="warning-box">
+            <strong>⚠️ Duplicate Dates Found:</strong> This employee has multiple entries for some dates. Please review.
+        </div>
+        {% endif %}
+        
+        {% if long_shift_needs %}
+        <div class="warning-box">
+            <strong>⚠️ Long Shifts:</strong> Some days have 10+ hours. Please review.
+        </div>
+        {% endif %}
+        
+        {% if pto_needs %}
+        <div class="warning-box">
+            <strong>⚠️ PTO Type Missing:</strong> Some PTO entries are missing a type. Please add.
+        </div>
+        {% endif %}
+        
+        <div class="timesheet-data">
+            <h3>Time Entries</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Clock In</th>
+                        <th>Clock Out</th>
+                        <th>Total Hours</th>
+                        <th>Break Hours</th>
+                        <th>PTO Hours</th>
+                        <th>PTO Type</th>
+                        <th>Hours Paid</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in grouped.rows %}
+                    <tr>
+                        <td>{{ row.work_date }}</td>
+                        <td>{{ row.clock_in }}</td>
+                        <td>{{ row.clock_out }}</td>
+                        <td>{{ row.total_hours }}</td>
+                        <td>{{ row.break_hours }}</td>
+                        <td>{{ row.pto_hours }}</td>
+                        <td>{{ row.pto_type or '-' }}</td>
+                        <td><strong>{{ row.hours_paid }}</strong></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="7"><strong>Total:</strong></td>
+                        <td><strong>{{ grouped.totals.paid_total }}</strong></td>
+                    </tr>
+                </tfoot>
+            </table>
+            
+            <div class="action-buttons">
+                {% if can_edit %}
+                <form method="post" action="/viewer/submit" style="display: inline;">
+                    <input type="hidden" name="employee_id" value="{{ selected_employee.id }}">
+                    <input type="hidden" name="timesheet_id" value="{{ active_ts }}">
+                    <button type="submit" class="btn btn-primary">Submit Timesheet</button>
+                </form>
+                {% endif %}
+                
+                {% if duplicates and can_edit %}
+                <form method="post" action="/viewer/keep-duplicates" style="display: inline;">
+                    <input type="hidden" name="employee_id" value="{{ selected_employee.id }}">
+                    <input type="hidden" name="timesheet_id" value="{{ active_ts }}">
+                    <button type="submit" class="btn btn-warning">Mark Duplicates as Reviewed</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <p class="no-data">No employee selected or no data available.</p>
+        {% endif %}
+        
+        {% endif %}
+    </div>
+</body>
+</html>
