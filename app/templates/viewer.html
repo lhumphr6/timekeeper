@@ -56,9 +56,18 @@
             </div>
             
             {% if can_edit and active_ts %}
-            <a href="/import/department?timesheet_id={{ active_ts }}" class="import-btn">
-                📥 Import Another Department
-            </a>
+            <div style="display: flex; gap: 10px;">
+                <a href="/import/department?timesheet_id={{ active_ts }}" class="import-btn">
+                    📥 Import Another Department
+                </a>
+                <form method="post" action="/import/department/undo-last" style="display: inline;">
+                    <input type="hidden" name="timesheet_id" value="{{ active_ts }}">
+                    <button type="submit" class="import-btn" style="background: #ff9800;" 
+                            onclick="return confirm('Are you sure you want to undo the last department import? This cannot be undone.')">
+                        ↩️ Undo Last Import
+                    </button>
+                </form>
+            </div>
             {% endif %}
         </div>
         
