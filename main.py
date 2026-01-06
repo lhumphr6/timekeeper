@@ -37,8 +37,6 @@ from .utils import (
 
 # Attendance router (keeps this file small)
 from .attendance import router as attendance_router
-# NEW: Department importer router
-from .dept_importer import router as dept_importer_router
 
 SECRET_KEY = os.getenv("SECRET_KEY", "please-change-me")
 DEFAULT_ADMIN_USER = os.getenv("DEFAULT_ADMIN_USER", "Admin")
@@ -957,6 +955,206 @@ def delete_period_post(
     db.commit()
 
     return RedirectResponse(url="/viewer?msg=Time+Period+deleted", status_code=303)
+
+# -----------------------
+# Admin: Employee status management
+# -----------------------
+@app.get("/admin/employees", response_class=HTMLResponse)
+@login_required
+def admin_employees_page(
+    request: Request,
+    include_inactive: int = Query(1),
+    db: Session = Depends(get_session),
+):
+    if not current_is_admin(db, request.session.get("user_id")):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    if include_inactive:
+        employees = db.query(Employee).order_by(Employee.name.asc()).all()
+    else:
+        employees = db.query(Employee).filter(text("COALESCE(is_active, TRUE) = TRUE")).order_by(Employee.name.asc()).all()
+
+    inactive_ids = {r[0] for r in db.execute(text("SELECT id FROM employees WHERE COALESCE(is_active, TRUE) = FALSE")).fetchall()}
+
+    return templates.TemplateResponse(
+        "admin_employees.html",
+        {
+            "request": request,
+            "employees": employees,
+            "include_inactive": include_inactive,
+            "inactive_ids": inactive_ids,
+        },
+    )
+
+@app.post("/admin/employees/set-status")
+@login_required
+def admin_employees_set_status(
+    request: Request,
+    employee_id: int = Form(...),
+    is_active: int = Form(...),  # 1 or 0
+    termination_date: Optional[str] = Form(None),
+    redirect_to: Optional[str] = Form(None),
+    db: Session = Depends(get_session),
+):
+    if not current_is_admin(db, request.session.get("user_id")):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    emp = db.query(Employee).get(employee_id)
+    if not emp:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+    emp.is_active = bool(int(is_active))
+    if not emp.is_active:
+        td = (termination_date or "").strip()
+        if td:
+            try:
+                emp.termination_date = date.fromisoformat(td)
+            except Exception:
+                raise HTTPException(status_code=400, detail="Invalid termination_date")
+        else:
+            emp.termination_date = None
+    else:
+        emp.termination_date = None
+
+    db.commit()
+    return RedirectResponse(url=(redirect_to or "/admin/employees"), status_code=303)
+
+# -----------------------
+# Admin: Users page
+# -----------------------
+@app.get("/admin/users", response_class=HTMLResponse)
+@login_required
+def admin_users_page(
+    request: Request,
+    msg: Optional[str] = None,
+    db: Session = Depends(get_session),
+):
+    if not current_is_admin(db, request.session.get("user_id")):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    users = db.query(User).order_by(User.username.asc()).all()
+    admin_ids = {r.user_id for r in db.query(AdminUser).all()}
+    profiles = {r.user_id: (r.full_name or "") for r in db.query(UserProfile).all()}
+    admin_count = len(admin_ids)
+
+    return templates.TemplateResponse(
+        "admin_users.html",
+        {
+            "request": request,
+            "users": users,
+            "admin_ids": admin_ids,
+            "profiles": profiles,
+            "admin_count": admin_count,
+            "me_id": request.session.get("user_id"),
+            "flash": msg,
+        },
+    )
+
+@app.post("/admin/users/create")
+@login_required
+def admin_users_create(
+    request: Request,
+    full_name: str = Form(""),
+    username: str = Form(...),
+    password: str = Form(...),
+    role: str = Form("user"),
+    db: Session = Depends(get_session),
+):
+    if not current_is_admin(db, request.session.get("user_id")):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    uname = (username or "").strip()
+    pwd = (password or "").strip()
+    role = (role or "user").strip().lower()
+    fname = (full_name or "").strip()
+
+    if not uname or not pwd:
+        return RedirectResponse(url="/admin/users?msg=Username+and+password+required", status_code=303)
+    if db.query(User).filter(User.username == uname).first():
+        return RedirectResponse(url="/admin/users?msg=Username+already+exists", status_code=303)
+
+    u = User(username=uname, password_hash=hash_password(pwd))
+    db.add(u)
+    db.flush()
+    db.add(UserProfile(user_id=u.id, full_name=fname or None))
+    if role == "admin":
+        db.add(AdminUser(user_id=u.id))
+    db.commit()
+    return RedirectResponse(url="/admin/users?msg=User+created", status_code=303)
+
+@app.post("/admin/users/reset-password")
+@login_required
+def admin_users_reset_password(
+    request: Request,
+    user_id: int = Form(...),
+    new_password: str = Form(...),
+    db: Session = Depends(get_session),
+):
+    if not current_is_admin(db, request.session.get("user_id")):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    u = db.query(User).get(user_id)
+    if not u:
+        return RedirectResponse(url="/admin/users?msg=User+not+found", status_code=303)
+    pwd = (new_password or "").strip()
+    if not pwd:
+        return RedirectResponse(url="/admin/users?msg=Password+required", status_code=303)
+    u.password_hash = hash_password(pwd)
+    db.commit()
+    return RedirectResponse(url="/admin/users?msg=Password+reset", status_code=303)
+
+@app.post("/admin/users/update-role")
+@login_required
+def admin_users_update_role(
+    request: Request,
+    user_id: int = Form(...),
+    role: str = Form(...),  # "admin" (demotion disabled)
+    db: Session = Depends(get_session),
+):
+    if not current_is_admin(db, request.session.get("user_id")):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    role = (role or "user").strip().lower()
+    target = db.query(User).get(user_id)
+    if not target:
+        return RedirectResponse(url="/admin/users?msg=User+not+found", status_code=303)
+
+    is_admin_now = bool(db.query(AdminUser).filter(AdminUser.user_id == user_id).first())
+
+    if role == "user":
+        # Demotion disabled per requirements
+        return RedirectResponse(url="/admin/users?msg=Demotion+disabled", status_code=303)
+
+    # Promote to admin if not already
+    if not is_admin_now:
+        db.add(AdminUser(user_id=user_id))
+        db.commit()
+        return RedirectResponse(url="/admin/users?msg=Promoted+to+admin", status_code=303)
+
+    return RedirectResponse(url="/admin/users?msg=Already+admin", status_code=303)
+
+@app.post("/admin/users/delete")
+@login_required
+def admin_users_delete(
+    request: Request,
+    user_id: int = Form(...),
+    db: Session = Depends(get_session),
+):
+    if not current_is_admin(db, request.session.get("user_id")):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    if user_id == request.session.get("user_id"):
+        return RedirectResponse(url="/admin/users?msg=Cannot+delete+the+current+user", status_code=303)
+
+    target = db.query(User).get(user_id)
+    if not target:
+        return RedirectResponse(url="/admin/users?msg=User+not+found", status_code=303)
+
+    db.query(AdminUser).filter(AdminUser.user_id == user_id).delete(synchronize_session=False)
+    db.query(UserProfile).filter(UserProfile.user_id == user_id).delete(synchronize_session=False)
+    db.delete(target)
+    db.commit()
+    return RedirectResponse(url="/admin/users?msg=User+deleted", status_code=303)
 
 # -------- Viewer (Timesheet Editor)
 @app.get("/viewer", response_class=HTMLResponse)
@@ -2026,9 +2224,8 @@ def pto_tracker_print_all(
         },
     )
 
-# Mount the Attendance router and NEW Department Importer router
+# Mount the Attendance router
 app.include_router(attendance_router)
-app.include_router(dept_importer_router)
 
 if __name__ == "__main__":
     import uvicorn
