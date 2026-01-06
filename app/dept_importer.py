@@ -4,7 +4,7 @@ import json
 import csv
 from datetime import datetime, date, timedelta
 from typing import Optional, List, Dict, Any
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Request, Depends, Form, UploadFile, File, HTTPException, Query
 from fastapi.responses import RedirectResponse, HTMLResponse
@@ -25,7 +25,7 @@ class ImportBatch(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     timesheet_id = Column(Integer, ForeignKey("timesheet_periods.id"), nullable=False, index=True)
     source_name = Column(String(512), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, nullable=False)
 
 class ImportBatchItem(Base):
     """Tracks individual entries in an import batch."""
@@ -116,7 +116,7 @@ def _parse_decimal(val: Any) -> Decimal:
         return Decimal("0")
     try:
         return q2(D(val))
-    except Exception:
+    except (ValueError, TypeError, InvalidOperation):
         return Decimal("0")
 
 
@@ -149,9 +149,12 @@ def _parse_csv_or_xlsx(file_path: str) -> List[Dict[str, Any]]:
                     if i < len(headers):
                         row_dict[headers[i]] = val
                 rows.append(row_dict)
-        except ImportError:
-            # Fall back to CSV if openpyxl not available
-            raise HTTPException(status_code=400, detail="Excel support not available. Please use CSV format.")
+        except ImportError as e:
+            # openpyxl not available - Excel support disabled
+            raise HTTPException(
+                status_code=400, 
+                detail="Excel file support requires openpyxl package. Please use CSV format or install openpyxl."
+            )
     else:
         # Parse CSV file
         with open(file_path, 'r', encoding='utf-8-sig') as f:
@@ -384,7 +387,8 @@ async def import_department_upload(
                 }
             )
     
-    except Exception as e:
+    except (IOError, OSError, ValueError) as e:
+        # Handle file and data parsing errors
         print(f"[dept_importer] Error processing upload: {e}")
         from app.utils import enumerate_timesheets_global
         from app.db import SessionLocal
