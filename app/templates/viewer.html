@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TimeKeeper Viewer</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .panel { background: #f5f5f5; padding: 20px; margin-bottom: 20px; border-radius: 8px; }
+        .panel-title { font-size: 1.5em; font-weight: bold; margin-bottom: 15px; }
+        .btn { padding: 8px 16px; margin: 4px; border: 1px solid #ccc; background: #fff; cursor: pointer; border-radius: 4px; text-decoration: none; display: inline-block; }
+        .btn.primary { background: #007bff; color: white; border-color: #007bff; }
+        .btn:hover { opacity: 0.8; }
+        .toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 15px; }
+        .label { font-weight: bold; }
+        .select, .input { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; }
+        .muted { color: #666; font-size: 0.9em; }
+        .flash { padding: 10px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; margin-bottom: 15px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 8px; border: 1px solid #ddd; text-align: left; }
+        th { background: #f0f0f0; font-weight: bold; }
+    </style>
+</head>
+<body class="tk">
+    <div class="page-wide">
+        <div class="panel">
+            <div class="panel-title">Timesheet Viewer</div>
+            
+            {% if flash %}
+            <div class="flash">{{ flash }}</div>
+            {% endif %}
+            
+            <div class="toolbar">
+                <label class="label">Period:</label>
+                <select class="select" onchange="location.href='/viewer?timesheet_id='+this.value">
+                    {% for p in period_options %}
+                    <option value="{{ p.timesheet_id }}" {% if active_ts == p.timesheet_id %}selected{% endif %}>
+                        {{ p.display }}
+                    </option>
+                    {% endfor %}
+                </select>
+                
+                {% if employees %}
+                <label class="label">Employee:</label>
+                <select class="select" onchange="location.href='/viewer?timesheet_id={{ active_ts }}&employee_id='+this.value">
+                    <option value="">-- Select Employee --</option>
+                    {% for emp in employees %}
+                    <option value="{{ emp.id }}" {% if selected_employee and selected_employee.id == emp.id %}selected{% endif %}>
+                        {{ emp.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+                {% endif %}
+            </div>
+            
+            {% if can_edit %}
+            <div class="panel">
+                <div class="panel-title">Actions</div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <a class="btn primary" href="/editor?timesheet_id={{ active_ts }}">Edit Timesheet</a>
+                    <a class="btn" href="/import/department?timesheet_id={{ active_ts }}">Import Another Department</a>
+                    <form method="post" action="/import/department/undo-last" style="display:inline;">
+                        <input type="hidden" name="timesheet_id" value="{{ active_ts }}">
+                        <button class="btn" type="submit" onclick="return confirm('Undo last department import for this period?')">Undo Last Department Import</button>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+            
+            {% if grouped and grouped.weeks %}
+            <div style="margin-top: 20px;">
+                <h3>Time Entries</h3>
+                {% for week_num, entries in grouped.weeks.items() %}
+                <h4>Week {{ week_num }}</h4>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Clock In</th>
+                            <th>Clock Out</th>
+                            <th>Break Hours</th>
+                            <th>Total Hours</th>
+                            <th>PTO Hours</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in entries %}
+                        <tr>
+                            <td>{{ entry.work_date }}</td>
+                            <td>{{ entry.clock_in }}</td>
+                            <td>{{ entry.clock_out }}</td>
+                            <td>{{ entry.break_hours }}</td>
+                            <td>{{ entry.total_hours }}</td>
+                            <td>{{ entry.pto_hours }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% endfor %}
+            </div>
+            {% elif selected_employee %}
+            <div class="muted">No time entries found for this employee in this period.</div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
