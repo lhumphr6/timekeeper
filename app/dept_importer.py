@@ -71,7 +71,7 @@ def _normalize_header(h: str) -> str:
     return header_mapping.get(h, h)
 
 
-def _parse_datetime(val: Any) -> Optional[datetime]:
+def _parse_datetime(val: Any, base_date: Optional[date] = None) -> Optional[datetime]:
     """Parse datetime from various formats."""
     if not val:
         return None
@@ -95,10 +95,18 @@ def _parse_datetime(val: Any) -> Optional[datetime]:
         "%m/%d/%Y %H:%M",
         "%m/%d/%Y",
         "%Y-%m-%d",
+        "%I:%M:%S %p",  # Time only with seconds
+        "%I:%M %p",     # Time only
+        "%H:%M:%S",     # 24-hour time with seconds
+        "%H:%M",        # 24-hour time
     ]
     for fmt in formats:
         try:
-            return datetime.strptime(s, fmt)
+            parsed = datetime.strptime(s, fmt)
+            # If it's a time-only format and we have a base date, combine them
+            if base_date and fmt in ["%I:%M:%S %p", "%I:%M %p", "%H:%M:%S", "%H:%M"]:
+                return datetime.combine(base_date, parsed.time())
+            return parsed
         except ValueError:
             continue
     return None
@@ -172,11 +180,13 @@ def _parse_csv_or_xlsx(file_path: str) -> List[Dict[str, Any]]:
 
 def _normalize_row(row_dict: Dict[str, Any]) -> Dict[str, Any]:
     """Normalize a single row to standard format."""
+    work_date = _parse_date(row_dict.get("date"))
+    
     normalized = {
         "employee_name": str(row_dict.get("employee_name", "")).strip(),
-        "date": _parse_date(row_dict.get("date")),
-        "clock_in": _parse_datetime(row_dict.get("clock_in")),
-        "clock_out": _parse_datetime(row_dict.get("clock_out")),
+        "date": work_date,
+        "clock_in": _parse_datetime(row_dict.get("clock_in"), work_date),
+        "clock_out": _parse_datetime(row_dict.get("clock_out"), work_date),
         "break_hours": _parse_decimal(row_dict.get("break_hours")),
         "pto_hours": _parse_decimal(row_dict.get("pto_hours")),
         "pto_type": str(row_dict.get("pto_type", "")).strip() or None,
