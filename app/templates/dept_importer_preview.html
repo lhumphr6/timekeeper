@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Preview Department Import</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 20px; }
+      .page-wide { max-width: 1200px; margin: 0 auto; }
+      .panel { background: #f5f5f5; padding: 20px; margin-bottom: 20px; border-radius: 8px; }
+      .panel-title { font-size: 1.5em; font-weight: bold; margin-bottom: 15px; }
+      .grid { width:100%; border-collapse: collapse; }
+      .grid th, .grid td { border: 1px solid #e5e7eb; padding: 6px 8px; }
+      .grid th { background: #f3f4f6; text-align: left; }
+      .btn { padding: 8px 16px; border: 1px solid #ccc; background: #fff; cursor: pointer; border-radius: 4px; text-decoration: none; margin-right: 8px; }
+      .btn.primary { background: #007bff; color: white; border-color: #007bff; }
+      .btn:hover { opacity: 0.8; }
+      .muted { color: #666; font-size: 0.9em; margin-top: 8px; }
+    </style>
+  </head>
+  <body class="tk">
+    <div class="page-wide">
+      <div class="panel">
+        <div class="panel-title">Select Employees to Import</div>
+        <form method="post" action="/import/department/execute" style="display:flex; flex-direction:column; gap:12px;">
+          <input type="hidden" name="slug" value="{{ slug }}">
+          <input type="hidden" name="timesheet_id" value="{{ timesheet_id }}">
+          <table class="grid">
+            <thead>
+              <tr>
+                <th style="width:36px;"><input type="checkbox" id="chkAll"></th>
+                <th>Employee</th>
+                <th>Status</th>
+                <th style="text-align:center;">Rows</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in preview %}
+              <tr>
+                <td style="text-align:center;"><input type="checkbox" class="chkRow" data-name="{{ row.employee_name }}"></td>
+                <td>{{ row.employee_name }}</td>
+                <td>{{ row.status }}</td>
+                <td style="text-align:center;">{{ row.row_count }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          <input type="hidden" name="selected_names" id="selected_names" value="">
+          <div style="display:flex; gap:8px; align-items:center;">
+            <button class="btn primary" type="submit" onclick="return gatherSelection();">Import Selected</button>
+            <a class="btn" href="/import/department?timesheet_id={{ timesheet_id }}">Start over</a>
+          </div>
+        </form>
+        <div class="muted" style="margin-top:8px;">Existing employees will have new rows appended (duplicates are skipped). New employees will be created automatically.</div>
+      </div>
+    </div>
+    <script>
+      document.getElementById('chkAll').addEventListener('change', function() {
+        var checked = this.checked;
+        document.querySelectorAll('.chkRow').forEach(function(chk) { chk.checked = checked; });
+      });
+      function gatherSelection() {
+        var names = [];
+        document.querySelectorAll('.chkRow:checked').forEach(function(chk) { names.push(chk.getAttribute('data-name')); });
+        if (names.length === 0) { alert('Please select at least one employee.'); return false; }
+        document.getElementById('selected_names').value = names.join(',');
+        return true;
+      }
+    </script>
+  </body>
+</html>
