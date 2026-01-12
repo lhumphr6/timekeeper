@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Import Preview - Timekeeper</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { color: #333; border-bottom: 2px solid #4CAF50; padding-bottom: 10px; }
+        .info-box { background: #e3f2fd; border-left: 4px solid #2196F3; padding: 15px; margin-bottom: 20px; }
+        .info-box strong { display: block; margin-bottom: 5px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #f5f5f5; font-weight: bold; color: #555; }
+        tr:hover { background: #f9f9f9; }
+        .status-existing { color: #4CAF50; }
+        .status-new { color: #2196F3; }
+        .checkbox-col { width: 40px; text-align: center; }
+        input[type="checkbox"] { cursor: pointer; }
+        .action-buttons { display: flex; gap: 15px; margin-top: 20px; }
+        button { padding: 12px 30px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        .btn-primary { background: #4CAF50; color: white; }
+        .btn-primary:hover { background: #45a049; }
+        .btn-secondary { background: #757575; color: white; }
+        .btn-secondary:hover { background: #616161; }
+        .select-all { margin-bottom: 15px; }
+        .back-link { display: inline-block; margin-top: 20px; color: #2196F3; text-decoration: none; }
+        .back-link:hover { text-decoration: underline; }
+    </style>
+    <script>
+        function toggleAll(checked) {
+            document.querySelectorAll('.employee-checkbox').forEach(cb => {
+                cb.checked = checked;
+            });
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>Import Preview</h1>
+        
+        <div class="info-box">
+            <strong>Time Period:</strong> {{ timesheet_name }}
+            <strong>Source File:</strong> {{ source_file }}
+            <strong>Employees Found:</strong> {{ preview_employees|length }}
+        </div>
+        
+        <div class="select-all">
+            <label>
+                <input type="checkbox" onclick="toggleAll(this.checked)" checked> Select/Deselect All
+            </label>
+        </div>
+        
+        <form method="post" action="/import/department/execute">
+            <input type="hidden" name="json_path" value="{{ json_path }}">
+            <input type="hidden" name="timesheet_id" value="{{ timesheet_id }}">
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th class="checkbox-col">Import</th>
+                        <th>Employee Name</th>
+                        <th>Status</th>
+                        <th>Rows to Import</th>
+                        <th>Date Range</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for emp in preview_employees %}
+                    <tr>
+                        <td class="checkbox-col">
+                            <input type="checkbox" name="selected_employees" value="{{ emp.name }}" class="employee-checkbox" checked>
+                        </td>
+                        <td>{{ emp.name }}</td>
+                        <td class="{% if 'New' in emp.status %}status-new{% else %}status-existing{% endif %}">
+                            {{ emp.status }}
+                        </td>
+                        <td>{{ emp.row_count }}</td>
+                        <td>{{ emp.date_range }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            
+            <div class="action-buttons">
+                <button type="submit" class="btn-primary">Import Selected Employees</button>
+                <a href="/import/department?timesheet_id={{ timesheet_id }}">
+                    <button type="button" class="btn-secondary">Cancel</button>
+                </a>
+            </div>
+        </form>
+        
+        <a href="/viewer?timesheet_id={{ timesheet_id }}" class="back-link">← Back to Timesheet Editor</a>
+    </div>
+</body>
+</html>
