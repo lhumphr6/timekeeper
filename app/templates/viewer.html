@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Timesheet Viewer</title>
+  </head>
+  <body class="tk">
+    <div class="page-wide">
+      <div class="panel">
+        <div class="panel-title">Timesheet Viewer</div>
+        
+        {% if flash %}
+        <div class="alert">{{ flash }}</div>
+        {% endif %}
+        
+        <!-- Period Selection -->
+        <div class="toolbar">
+          <label>Period:</label>
+          <select id="period-select" onchange="window.location.href='/viewer?timesheet_id=' + this.value;">
+            {% for p in period_options %}
+              <option value="{{ p.timesheet_id }}" {% if active_ts == p.timesheet_id %}selected{% endif %}>{{ p.display }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        
+        <!-- Employee List -->
+        <div class="employee-list">
+          {% for emp in employees %}
+            <div class="employee-item">{{ emp.name }}</div>
+          {% endfor %}
+        </div>
+        
+        <!-- Actions Panel -->
+        {% if can_edit %}
+        <div class="panel">
+          <div class="panel-title">Actions</div>
+          <div class="toolbar" style="gap:8px; flex-wrap:wrap;">
+            <a class="btn" href="/import/department?timesheet_id={{ active_ts }}">Import Another Department</a>
+            <form method="post" action="/import/department/undo-last" style="display:inline;">
+              <input type="hidden" name="timesheet_id" value="{{ active_ts }}">
+              <button class="btn" type="submit" onclick="return confirm('Undo last department import for this period?')">Undo Last Department Import</button>
+            </form>
+          </div>
+        </div>
+        {% endif %}
+        
+        <!-- Timesheet Data -->
+        {% if grouped %}
+        <div class="timesheet-data">
+          <!-- Timesheet rows would be displayed here -->
+          <p>Employee: {{ selected_employee.name if selected_employee else 'None' }}</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </body>
+</html>

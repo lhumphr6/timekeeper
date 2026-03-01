@@ -37,6 +37,7 @@ from .utils import (
 
 # Attendance router (keeps this file small)
 from .attendance import router as attendance_router
+from .dept_importer import router as dept_importer_router
 
 SECRET_KEY = os.getenv("SECRET_KEY", "please-change-me")
 DEFAULT_ADMIN_USER = os.getenv("DEFAULT_ADMIN_USER", "Admin")
@@ -213,30 +214,51 @@ class PTOUsageExclusion(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 def ensure_schema():
+    """Ensure additional schema migrations (SQLite-safe)."""
     with engine.connect() as conn:
+        # SQLite doesn't support IF NOT EXISTS in ALTER TABLE
+        # We'll wrap in try-except to handle existing columns
+        
         # Backup columns for times hidden by PTO status in print view
-        conn.execute(text("ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS pto_clock_in_backup TIMESTAMP NULL"))
-        conn.execute(text("ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS pto_clock_out_backup TIMESTAMP NULL"))
+        try:
+            conn.execute(text("ALTER TABLE time_entries ADD COLUMN pto_clock_in_backup TIMESTAMP NULL"))
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE time_entries ADD COLUMN pto_clock_out_backup TIMESTAMP NULL"))
+        except Exception:
+            pass
 
         # Year columns for per-year PTO tracking
-        conn.execute(text("ALTER TABLE pto_accounts ADD COLUMN IF NOT EXISTS year INTEGER"))
-        conn.execute(text("ALTER TABLE pto_adjustments ADD COLUMN IF NOT EXISTS year INTEGER"))
+        try:
+            conn.execute(text("ALTER TABLE pto_accounts ADD COLUMN year INTEGER"))
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE pto_adjustments ADD COLUMN year INTEGER"))
+        except Exception:
+            pass
 
-        # Backfill existing rows to current year if null
-        conn.execute(text("UPDATE pto_accounts SET year = EXTRACT(YEAR FROM NOW())::INTEGER WHERE year IS NULL"))
-        conn.execute(text("UPDATE pto_adjustments SET year = EXTRACT(YEAR FROM NOW())::INTEGER WHERE year IS NULL"))
-
-        # SAFEGUARD: Drop incorrect unique index that enforces only one row per employee
-        # This index conflicts with per-year balances and caused the error you saw.
-        conn.execute(text("DROP INDEX IF EXISTS ix_pto_accounts_employee_id"))
-
-        # Enforce one starting balance per employee per year (correct composite uniqueness)
-        conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS idx_pto_accounts_emp_year ON pto_accounts (employee_id, year)"))
+        # Backfill existing rows to current year if null (SQLite-compatible)
+        try:
+            conn.execute(text("UPDATE pto_accounts SET year = strftime('%Y', 'now') WHERE year IS NULL"))
+            conn.execute(text("UPDATE pto_adjustments SET year = strftime('%Y', 'now') WHERE year IS NULL"))
+        except Exception:
+            pass
 
         # Employee active status + termination date
-        conn.execute(text("ALTER TABLE employees ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE"))
-        conn.execute(text("ALTER TABLE employees ADD COLUMN IF NOT EXISTS termination_date DATE NULL"))
-        conn.execute(text("UPDATE employees SET is_active = TRUE WHERE is_active IS NULL"))
+        try:
+            conn.execute(text("ALTER TABLE employees ADD COLUMN is_active BOOLEAN DEFAULT 1"))
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE employees ADD COLUMN termination_date DATE NULL"))
+        except Exception:
+            pass
+        try:
+            conn.execute(text("UPDATE employees SET is_active = 1 WHERE is_active IS NULL"))
+        except Exception:
+            pass
 
         conn.commit()
 
@@ -2226,6 +2248,7 @@ def pto_tracker_print_all(
 
 # Mount the Attendance router
 app.include_router(attendance_router)
+app.include_router(dept_importer_router)
 
 if __name__ == "__main__":
     import uvicorn
